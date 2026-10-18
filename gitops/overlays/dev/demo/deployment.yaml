@@ -1,34 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: securellm-demo
+  name: securellm-ai-gateway
   namespace: securellm
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: securellm-demo
+      app: securellm-ai-gateway
   template:
     metadata:
       labels:
-        app: securellm-demo
+        app: securellm-ai-gateway
     spec:
       containers:
-        - name: demo
-          image: nginxinc/nginx-unprivileged:1.27
+        - name: ai-gateway
+          image: 391727473376.dkr.ecr.us-east-1.amazonaws.com/securellm/ai-gateway:latest
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 250m
+              cpu: 100m
               memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
             capabilities:
               drop:
                 - ALL
-                

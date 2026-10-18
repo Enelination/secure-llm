@@ -170,3 +170,13 @@ temp/
 *.tmp
 *.bak
 **/.terraform/
+
+# macOS
+.DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log

@@ -3,3 +3,8 @@ kind: Kustomization
 
 resources:
   - deployment.yaml
+  - service.yaml
+
+images:
+  - name: 391727473376.dkr.ecr.us-east-1.amazonaws.com/securellm/ai-gateway
+    newTag: latest
