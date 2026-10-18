@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: demo
-          image: nginx:1.27
+          image: nginxinc/nginx-unprivileged:1.27
           ports:
             - containerPort: 80
           resources:
