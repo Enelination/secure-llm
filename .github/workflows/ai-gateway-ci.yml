@@ -21,6 +21,10 @@ env:
   ECR_REPOSITORY: securellm/ai-gateway
 
 jobs:
+
+  # --------------------------------------------------
+  # TEST
+  # --------------------------------------------------
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -51,6 +55,9 @@ jobs:
         run: |
           python -m compileall .
 
+  # --------------------------------------------------
+  # SECURITY SCAN
+  # --------------------------------------------------
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -66,28 +73,85 @@ jobs:
           scan-ref: applications/ai-gateway
           severity: HIGH,CRITICAL
           exit-code: "1"
+          ignore-unfixed: true
 
+  # --------------------------------------------------
+  # BUILD + SCAN + PUSH
+  # --------------------------------------------------
   build:
-    name: Build Image
+    name: Build and Push Image
     runs-on: ubuntu-latest
+
     needs:
       - test
       - security
 
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ----------------------------------------------
+      # AWS OIDC
+      # ----------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::391727473376:role/GitHubActions-SecureLLM
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ----------------------------------------------
+      # ECR LOGIN
+      # ----------------------------------------------
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ----------------------------------------------
+      # BUILD
+      # ----------------------------------------------
       - name: Build Docker image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
-            -t securellm-ai-gateway:${{ github.sha }} \
+            -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             applications/ai-gateway
 
+      # ----------------------------------------------
+      # CONTAINER SECURITY SCAN
+      # ----------------------------------------------
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: securellm-ai-gateway:${{ github.sha }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
+
+      # ----------------------------------------------
+      # PUSH ONLY AFTER SECURITY SCAN PASSES
+      # ----------------------------------------------
+      - name: Push image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker push \
+            $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # ----------------------------------------------
+      # SHOW IMAGE
+      # ----------------------------------------------
+      - name: Image summary
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Image successfully pushed:"
+          echo "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
