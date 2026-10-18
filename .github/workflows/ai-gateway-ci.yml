@@ -22,13 +22,14 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: securellm/ai-gateway
   IMAGE_NAME: securellm-ai-gateway
+  GITOPS_FILE: gitops/overlays/dev/demo/kustomization.yaml
 
-
-# ============================================================
-# TEST
-# ============================================================
 
 jobs:
+
+  # ============================================================
+  # TEST
+  # ============================================================
 
   test:
     name: Test AI Gateway
@@ -137,14 +138,9 @@ jobs:
 
 
   # ============================================================
-  # PUSH TO ECR
+  # PUBLISH TO ECR
   #
-  # IMPORTANT:
-  # This job ONLY runs after a direct push to main.
-  #
-  # This matches the IAM trust policy:
-  #
-  # repo:Enelination/secure-llm:ref:refs/heads/main
+  # Only runs on direct pushes to main.
   # ============================================================
 
   publish:
@@ -160,6 +156,10 @@ jobs:
       contents: read
       id-token: write
 
+    outputs:
+      image_tag: ${{ steps.image.outputs.tag }}
+      image_uri: ${{ steps.image.outputs.image_uri }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -168,7 +168,9 @@ jobs:
         id: image
         run: |
           IMAGE_TAG="${GITHUB_SHA::12}"
+
           echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
           echo "Image tag: ${IMAGE_TAG}"
 
       # --------------------------------------------------------
@@ -199,9 +201,6 @@ jobs:
 
       # --------------------------------------------------------
       # Build image
-      #
-      # We rebuild here because GitHub Actions jobs have
-      # separate runners.
       # --------------------------------------------------------
 
       - name: Build Docker image
@@ -212,7 +211,7 @@ jobs:
             .
 
       # --------------------------------------------------------
-      # Final image security scan before pushing
+      # Final Trivy image scan
       # --------------------------------------------------------
 
       - name: Trivy image scan
@@ -229,8 +228,11 @@ jobs:
 
       - name: Push image to ECR
         run: |
-          docker push \
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}"
+
+          docker push "$IMAGE_URI"
+
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
       # --------------------------------------------------------
       # Summary
@@ -245,3 +247,100 @@ jobs:
           echo "✅ Image published successfully" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Image:** \`$IMAGE_URI\`" >> "$GITHUB_STEP_SUMMARY"
+
+
+  # ============================================================
+  # UPDATE GITOPS
+  #
+  # Updates the immutable image tag in Kustomize.
+  #
+  # This job commits the GitOps change back to main.
+  #
+  # Argo CD then detects the Git change and deploys it.
+  # ============================================================
+
+  gitops:
+    name: Update GitOps
+    needs:
+      - publish
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update image tag
+        env:
+          IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
+        run: |
+          echo "Updating GitOps image tag to: ${IMAGE_TAG}"
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          file = Path(os.environ["GITOPS_FILE"])
+          tag = os.environ["IMAGE_TAG"]
+
+          content = file.read_text()
+
+          updated = re.sub(
+              r'(\s+newTag:\s*)[^\s]+',
+              rf'\g<1>{tag}',
+              content,
+              count=1,
+          )
+
+          if updated == content:
+              raise SystemExit(
+                  f"Could not find newTag in {file}"
+              )
+
+          file.write_text(updated)
+          PY
+
+          echo "Updated GitOps manifest:"
+          cat "$GITOPS_FILE"
+
+      - name: Check Git diff
+        run: |
+          git diff -- "$GITOPS_FILE"
+
+      - name: Commit GitOps change
+        env:
+          IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "$GITOPS_FILE"
+
+          if git diff --cached --quiet; then
+            echo "No GitOps changes detected."
+            exit 0
+          fi
+
+          git commit -m "chore: deploy ai-gateway ${IMAGE_TAG}"
+
+          git push origin main
+
+      - name: Deployment summary
+        env:
+          IMAGE_TAG: ${{ needs.publish.outputs.image_tag }}
+        run: |
+          echo "### GitOps Deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ GitOps manifest updated" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Image tag:** \`${IMAGE_TAG}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Argo CD should now reconcile the change." >> "$GITHUB_STEP_SUMMARY"
