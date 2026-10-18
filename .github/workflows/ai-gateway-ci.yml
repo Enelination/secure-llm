@@ -1,12 +1,14 @@
 name: AI Gateway CI
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
     paths:
       - "applications/ai-gateway/**"
       - ".github/workflows/ai-gateway-ci.yml"
 
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -19,14 +21,17 @@ permissions:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: securellm/ai-gateway
+  IMAGE_NAME: securellm-ai-gateway
+
+
+# ============================================================
+# TEST
+# ============================================================
 
 jobs:
 
-  # --------------------------------------------------
-  # TEST
-  # --------------------------------------------------
   test:
-    name: Test
+    name: Test AI Gateway
     runs-on: ubuntu-latest
 
     defaults:
@@ -46,18 +51,25 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
-      - name: Install test dependencies
-        run: |
           pip install pytest httpx
 
-      - name: Compile application
+      - name: Compile Python
         run: |
           python -m compileall .
 
-  # --------------------------------------------------
-  # SECURITY SCAN
-  # --------------------------------------------------
+      - name: Run tests
+        run: |
+          if [ -d "tests" ]; then
+            pytest -v
+          else
+            echo "No tests directory found. Skipping pytest."
+          fi
+
+
+  # ============================================================
+  # SECURITY
+  # ============================================================
+
   security:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -75,83 +87,161 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
-  # --------------------------------------------------
-  # BUILD + SCAN + PUSH
-  # --------------------------------------------------
-  build:
-    name: Build and Push Image
-    runs-on: ubuntu-latest
 
+  # ============================================================
+  # BUILD + IMAGE SECURITY SCAN
+  #
+  # Runs on both PRs and pushes.
+  # Does NOT require AWS credentials.
+  # ============================================================
+
+  build:
+    name: Build and Scan Docker Image
     needs:
       - test
       - security
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: image
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${IMAGE_TAG}"
+
+      - name: Build Docker image
+        working-directory: applications/ai-gateway
+        run: |
+          docker build \
+            -t ${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }} \
+            .
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: "${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}"
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Docker image summary
+        run: |
+          echo "### Docker Image" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+
+  # ============================================================
+  # PUSH TO ECR
+  #
+  # IMPORTANT:
+  # This job ONLY runs after a direct push to main.
+  #
+  # This matches the IAM trust policy:
+  #
+  # repo:Enelination/secure-llm:ref:refs/heads/main
+  # ============================================================
+
+  publish:
+    name: Publish Image to ECR
+    needs:
+      - build
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
 
     permissions:
       contents: read
       id-token: write
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ----------------------------------------------
+      - name: Generate image tag
+        id: image
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Image tag: ${IMAGE_TAG}"
+
+      # --------------------------------------------------------
       # AWS OIDC
-      # ----------------------------------------------
+      # --------------------------------------------------------
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::391727473376:role/GitHubActions-SecureLLM
           aws-region: ${{ env.AWS_REGION }}
 
-      # ----------------------------------------------
-      # ECR LOGIN
-      # ----------------------------------------------
+      # --------------------------------------------------------
+      # Verify AWS identity
+      # --------------------------------------------------------
+
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
+
+      # --------------------------------------------------------
+      # Login to ECR
+      # --------------------------------------------------------
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # ----------------------------------------------
-      # BUILD
-      # ----------------------------------------------
+      # --------------------------------------------------------
+      # Build image
+      #
+      # We rebuild here because GitHub Actions jobs have
+      # separate runners.
+      # --------------------------------------------------------
+
       - name: Build Docker image
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+        working-directory: applications/ai-gateway
         run: |
           docker build \
-            -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            applications/ai-gateway
+            -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }} \
+            .
 
-      # ----------------------------------------------
-      # CONTAINER SECURITY SCAN
-      # ----------------------------------------------
+      # --------------------------------------------------------
+      # Final image security scan before pushing
+      # --------------------------------------------------------
+
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          image-ref: "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}"
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
 
-      # ----------------------------------------------
-      # PUSH ONLY AFTER SECURITY SCAN PASSES
-      # ----------------------------------------------
-      - name: Push image to Amazon ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      # --------------------------------------------------------
+      # Push image
+      # --------------------------------------------------------
+
+      - name: Push image to ECR
         run: |
           docker push \
-            $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}
 
-      # ----------------------------------------------
-      # SHOW IMAGE
-      # ----------------------------------------------
-      - name: Image summary
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      # --------------------------------------------------------
+      # Summary
+      # --------------------------------------------------------
+
+      - name: Publish summary
         run: |
-          echo "Image successfully pushed:"
-          echo "$REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}"
+
+          echo "### SecureLLM AI Gateway" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Image published successfully" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Image:** \`$IMAGE_URI\`" >> "$GITHUB_STEP_SUMMARY"
