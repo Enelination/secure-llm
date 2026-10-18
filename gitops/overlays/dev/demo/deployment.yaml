@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securellm-demo
+  namespace: securellm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: securellm-demo
+  template:
+    metadata:
+      labels:
+        app: securellm-demo
+    spec:
+      containers:
+        - name: demo
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
