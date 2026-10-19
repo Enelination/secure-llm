@@ -4,11 +4,12 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from providers.mock import MockProvider
+from providers.vllm import VLLMProvider
 
 
 app = FastAPI(
     title="SecureLLM AI Gateway",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 
@@ -20,6 +21,7 @@ MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "mock")
 
 providers = {
     "mock": MockProvider(),
+    "vllm": VLLMProvider(),
 }
 
 if MODEL_PROVIDER not in providers:
