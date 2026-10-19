@@ -331,7 +331,15 @@ jobs:
 
           git commit -m "chore: deploy ai-gateway ${IMAGE_TAG}"
 
-          git push origin main
+          # Rebase onto main and retry in case a human push landed meanwhile
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin main; then
+              break
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "Push attempt $i failed, retrying..."
+            sleep 10
+          done
 
       - name: Deployment summary
         env:

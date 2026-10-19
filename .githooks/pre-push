@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Auto-rebase onto the remote branch before pushing.
+# Prevents non-fast-forward rejections caused by CI commits
+# (e.g. "chore: deploy ai-gateway ...") landing on the remote
+# while you were working locally.
+
+while read remote_ref local_ref
+do
+  case "$remote_ref" in
+    refs/heads/*)
+      branch="${remote_ref#refs/heads/}"
+
+      # Skip branch deletes
+      zero="0000000000000000000000000000000000000000"
+      [ "$local_ref" = "$zero" ] && continue
+
+      if ! git fetch origin "$branch"; then
+        echo "pre-push: fetch of origin/$branch failed, pushing anyway" >&2
+        continue
+      fi
+
+      if ! git rev-parse --verify -q "origin/$branch" >/dev/null; then
+        continue
+      fi
+
+      if [ "$(git rev-list --count "origin/$branch..HEAD")" -eq 0 ]; then
+        continue
+      fi
+
+      if ! git rebase "origin/$branch"; then
+        git rebase --abort 2>/dev/null
+        echo "pre-push: rebase onto origin/$branch failed (resolve conflicts, then push again)" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+exit 0
