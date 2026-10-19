@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: securellm-vllm
+  namespace: securellm-models
+spec:
+  selector:
+    app: securellm-vllm
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP

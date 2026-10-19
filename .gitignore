@@ -150,7 +150,7 @@ coverage/
 # AI / ML
 # ============================================================
 
-models/
+#models/
 model-cache/
 huggingface-cache/
 *.gguf
@@ -180,3 +180,7 @@ temp/
 *.tfstate.*
 crash.log
 crash.*.log.venv/
+
+# GitOps model-serving manifests
+!gitops/overlays/dev/models/
+!gitops/overlays/dev/models/**
