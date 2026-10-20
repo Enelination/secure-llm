@@ -18,6 +18,13 @@ spec:
           image: 391727473376.dkr.ecr.us-east-1.amazonaws.com/securellm/ai-gateway:latest
           ports:
             - containerPort: 8080
+
+          env:
+            - name: MODEL_PROVIDER
+              value: "vllm"
+            - name: MODEL_ENDPOINT
+              value: "http://securellm-vllm.securellm-models.svc.cluster.local:8000"
+
           resources:
             requests:
               cpu: 100m
@@ -25,6 +32,7 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true
