@@ -5,7 +5,7 @@ metadata:
   namespace: securellm-models
 spec:
   selector:
-    app: securellm-vllm
+    app: securellm-llama
   ports:
     - name: http
       port: 8000

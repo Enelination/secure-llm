@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - vllm.yaml
   - service.yaml
+  - pvc.yaml
