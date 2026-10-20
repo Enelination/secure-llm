@@ -27,3 +27,8 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.50.0.0/16"
 }
+variable "domain_name" {
+  description = "Public domain managed in Cloudflare"
+  type        = string
+  default     = "rogfoundation.org"
+}

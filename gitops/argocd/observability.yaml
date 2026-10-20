@@ -13,6 +13,15 @@ spec:
 
     helm:
       releaseName: kube-prometheus-stack
+      values: |
+        grafana:
+          grafana.ini:
+            server:
+              domain: grafana.rogfoundation.org
+              root_url: https://grafana.rogfoundation.org/
+            security:
+              cookie_secure: "true"
+              cookie_samesite: "lax"
 
   destination:
     server: https://kubernetes.default.svc
