@@ -9,9 +9,11 @@ metadata:
     alb.ingress.kubernetes.io/group.name: securellm
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:391727473376:certificate/30eedffe-ba1c-4d3c-b986-8e04fb6788d2
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-success-codes: 200-399
 spec:
   ingressClassName: alb
   rules:
