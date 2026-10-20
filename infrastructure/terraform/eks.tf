@@ -54,7 +54,7 @@ module "eks" {
     system = {
       name = "${var.project_name}-system"
 
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.xlarge"]
 
       min_size     = 1
       max_size     = 3
