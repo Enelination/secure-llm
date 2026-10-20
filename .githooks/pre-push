@@ -28,8 +28,8 @@ do
         continue
       fi
 
-      if ! git rebase "origin/$branch"; then
-        git rebase --abort 2>/dev/null
+      if ! git -c rebase.autoStash=true rebase "origin/$branch"; then
+        git rebase --abort 2>/dev/null || true
         echo "pre-push: rebase onto origin/$branch failed (resolve conflicts, then push again)" >&2
         exit 1
       fi
