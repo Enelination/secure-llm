@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: securellm-ai-gateway
   namespace: securellm
+  labels:
+    app: securellm-ai-gateway
 spec:
   selector:
     app: securellm-ai-gateway
