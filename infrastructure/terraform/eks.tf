@@ -30,10 +30,23 @@ module "eks" {
   }
 
   addons = {
-    coredns    = {}
+    coredns = {}
+
     kube-proxy = {}
+
     vpc-cni = {
       before_compute = true
+    }
+
+    eks-pod-identity-agent = {}
+
+    aws-ebs-csi-driver = {
+      pod_identity_association = [
+        {
+          role_arn        = module.ebs_csi_iam_role.arn
+          service_account = "ebs-csi-controller-sa"
+        }
+      ]
     }
   }
 
@@ -53,6 +66,61 @@ module "eks" {
 
       labels = {
         workload = "system"
+      }
+    }
+
+    llm_cpu = {
+      name = "${var.project_name}-llm-cpu"
+
+      instance_types = ["m7i.2xlarge"]
+
+      min_size     = 0
+      max_size     = 1
+      desired_size = 0
+
+      capacity_type = "ON_DEMAND"
+
+      disk_size = 100
+
+      labels = {
+        workload = "llm-cpu"
+      }
+
+      taints = {
+        llm = {
+          key    = "workload"
+          value  = "llm-cpu"
+          effect = "NO_SCHEDULE"
+        }
+      }
+    }
+
+    gpu = {
+      name = "${var.project_name}-gpu"
+
+      instance_types = ["g5.xlarge"]
+
+      min_size     = 0
+      max_size     = 1
+      desired_size = 0
+
+      capacity_type = "ON_DEMAND"
+
+      disk_size = 100
+
+      ami_type = "AL2023_x86_64_NVIDIA"
+
+      labels = {
+        workload    = "llm"
+        accelerator = "nvidia"
+      }
+
+      taints = {
+        llm = {
+          key    = "workload"
+          value  = "llm"
+          effect = "NO_SCHEDULE"
+        }
       }
     }
   }
