@@ -12,12 +12,41 @@ metadata:
     alb.ingress.kubernetes.io/backend-protocol: HTTP
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:391727473376:certificate/30eedffe-ba1c-4d3c-b986-8e04fb6788d2
     alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/actions.blocked: '{"type":"fixed-response","fixedResponseConfig":{"statusCode":"404","contentType":"text/plain","messageBody":"Not Found"}}'
 spec:
   ingressClassName: alb
   rules:
     - host: api.rogfoundation.org
       http:
         paths:
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: blocked
+                port:
+                  name: use-annotation
+          - path: /redoc
+            pathType: Prefix
+            backend:
+              service:
+                name: blocked
+                port:
+                  name: use-annotation
+          - path: /openapi.json
+            pathType: Prefix
+            backend:
+              service:
+                name: blocked
+                port:
+                  name: use-annotation
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: blocked
+                port:
+                  name: use-annotation
           - path: /
             pathType: Prefix
             backend:

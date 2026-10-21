@@ -1,7 +1,10 @@
+import hashlib
+import hmac
 import os
+import threading
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import Response
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel
@@ -10,9 +13,14 @@ from providers.mock import MockProvider
 from providers.vllm import VLLMProvider
 
 
+DOCS_ENABLED = os.getenv("DOCS_ENABLED", "false").lower() == "true"
+
 app = FastAPI(
     title="SecureLLM AI Gateway",
     version="0.4.0",
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url="/redoc" if DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
 )
 
 
@@ -98,6 +106,98 @@ LLM_INFLIGHT_REQUESTS = Gauge(
     ["provider"],
 )
 
+LLM_AUTH_FAILURES_TOTAL = Counter(
+    "llm_auth_failures_total",
+    "Total number of requests rejected due to missing or invalid credentials",
+    ["reason"],
+)
+
+LLM_RATE_LIMITED_TOTAL = Counter(
+    "llm_rate_limited_total",
+    "Total number of requests rejected by the rate limiter",
+    ["client"],
+)
+
+REQUIRE_AUTH = os.getenv("REQUIRE_AUTH", "true").lower() != "false"
+
+RATE_LIMIT_RPM = int(os.getenv("RATE_LIMIT_RPM", "60"))
+RATE_LIMIT_BURST = int(os.getenv("RATE_LIMIT_BURST", "10"))
+
+
+def _load_api_keys(raw: str) -> dict:
+    keys = {}
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if ":" in item:
+            name, secret = item.split(":", 1)
+        else:
+            name, secret = item[:6], item
+        keys[name.strip()] = hashlib.sha256(secret.strip().encode()).hexdigest()
+    return keys
+
+
+API_KEYS = _load_api_keys(os.getenv("API_KEYS", ""))
+
+
+class TokenBucket:
+    def __init__(self, rate_per_minute: int, burst: int):
+        self.capacity = max(1, burst)
+        self.refill_per_second = max(rate_per_minute, 1) / 60.0
+        self.lock = threading.Lock()
+        self.state = {}
+
+    def allow(self, client_id: str) -> bool:
+        now = time.monotonic()
+        with self.lock:
+            tokens, last = self.state.get(client_id, (float(self.capacity), now))
+            tokens = min(self.capacity, tokens + (now - last) * self.refill_per_second)
+            if tokens < 1.0:
+                self.state[client_id] = (tokens, now)
+                return False
+            self.state[client_id] = (tokens - 1.0, now)
+            return True
+
+
+rate_limiter = TokenBucket(RATE_LIMIT_RPM, RATE_LIMIT_BURST)
+
+
+def authenticate(
+    x_api_key: str = Header(default=None),
+    authorization: str = Header(default=None),
+) -> str:
+    if not REQUIRE_AUTH:
+        return "anonymous"
+
+    if not API_KEYS:
+        LLM_AUTH_FAILURES_TOTAL.labels(reason="not_configured").inc()
+        raise HTTPException(status_code=503, detail="Authentication is not configured")
+
+    provided = x_api_key
+    if not provided and authorization and authorization.lower().startswith("bearer "):
+        provided = authorization[7:].strip()
+
+    if not provided:
+        LLM_AUTH_FAILURES_TOTAL.labels(reason="missing").inc()
+        raise HTTPException(
+            status_code=401,
+            detail="Missing API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    digest = hashlib.sha256(provided.encode()).hexdigest()
+    for name, expected in API_KEYS.items():
+        if hmac.compare_digest(digest, expected):
+            return name
+
+    LLM_AUTH_FAILURES_TOTAL.labels(reason="invalid").inc()
+    raise HTTPException(
+        status_code=401,
+        detail="Invalid API key",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
 
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
@@ -152,7 +252,15 @@ def metrics():
 
 
 @app.post("/v1/chat/completions")
-def chat(request: ChatRequest):
+def chat(request: ChatRequest, identity: str = Depends(authenticate)):
+    if not rate_limiter.allow(identity):
+        LLM_RATE_LIMITED_TOTAL.labels(client=identity).inc()
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": "1"},
+        )
+
     start = time.perf_counter()
 
     LLM_REQUESTS_TOTAL.labels(

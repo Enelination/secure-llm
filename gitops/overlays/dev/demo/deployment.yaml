@@ -68,6 +68,17 @@ spec:
               value: "vllm"
             - name: MODEL_ENDPOINT
               value: "http://securellm-vllm.securellm-models.svc.cluster.local:8000"
+            - name: REQUIRE_AUTH
+              value: "true"
+            - name: RATE_LIMIT_RPM
+              value: "60"
+            - name: RATE_LIMIT_BURST
+              value: "10"
+            - name: API_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: securellm-api-keys
+                  key: api-keys
 
           startupProbe:
             httpGet:
