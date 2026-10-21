@@ -245,4 +245,4 @@ Notes:
 
 ## Further reading
 
-- [Running a self-hosted LLM gateway on EKS](docs/blog/2026-10-21-securellm-on-eks.md) — architecture decisions, failures, and lessons learned.
+- [Building a Secure LLM Platform on Amazon EKS](docs/blog/building-secure-llm-on-eks.md) — infrastructure, application, observability, and security decisions, with evidence.
