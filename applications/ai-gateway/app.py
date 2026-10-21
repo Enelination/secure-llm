@@ -170,7 +170,7 @@ def chat(request: ChatRequest):
             provider=MODEL_PROVIDER,
         ).observe(time.perf_counter() - start)
 
-        model = response.get("model", "unknown")
+        model = model_provider.name
 
         usage = response.get("usage") or {}
         prompt_tokens = usage.get("prompt_tokens", 0) or 0
@@ -212,7 +212,7 @@ def chat(request: ChatRequest):
 
         LLM_MODEL_UP.labels(
             provider=MODEL_PROVIDER,
-            model="unknown",
+            model=model_provider.name,
         ).set(0)
 
         raise
