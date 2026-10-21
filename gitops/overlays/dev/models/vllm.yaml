@@ -5,6 +5,10 @@ metadata:
   namespace: securellm-models
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
+
+  strategy:
+    type: Recreate
 
   selector:
     matchLabels:
@@ -16,6 +20,22 @@ spec:
         app: securellm-llama
 
     spec:
+      terminationGracePeriodSeconds: 30
+
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: securellm-llama
+
       nodeSelector:
         workload: llm-cpu
 
@@ -30,6 +50,7 @@ spec:
           image: curlimages/curl:latest
           securityContext:
             runAsUser: 0
+            allowPrivilegeEscalation: false
           command:
             - sh
             - -c
@@ -67,7 +88,38 @@ spec:
             - "8"
 
           ports:
-            - containerPort: 8000
+            - name: http
+              containerPort: 8000
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 4
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
 
           resources:
             requests:

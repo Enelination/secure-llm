@@ -5,3 +5,4 @@ resources:
   - vllm.yaml
   - service.yaml
   - pvc.yaml
+  - networkpolicy.yaml

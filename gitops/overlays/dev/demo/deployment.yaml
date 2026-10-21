@@ -4,26 +4,98 @@ metadata:
   name: securellm-ai-gateway
   namespace: securellm
 spec:
-  replicas: 1
+  replicas: 2
+  revisionHistoryLimit: 3
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
   selector:
     matchLabels:
       app: securellm-ai-gateway
+
   template:
     metadata:
       labels:
         app: securellm-ai-gateway
+
     spec:
+      terminationGracePeriodSeconds: 30
+
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: securellm-ai-gateway
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: securellm-ai-gateway
+
       containers:
         - name: ai-gateway
           image: 391727473376.dkr.ecr.us-east-1.amazonaws.com/securellm/ai-gateway:latest
+          imagePullPolicy: IfNotPresent
+
+          args:
+            - uvicorn
+            - app:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8080"
+            - --timeout-graceful-shutdown
+            - "25"
+
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
 
           env:
             - name: MODEL_PROVIDER
               value: "vllm"
             - name: MODEL_ENDPOINT
               value: "http://securellm-vllm.securellm-models.svc.cluster.local:8000"
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]
 
           resources:
             requests:
@@ -35,7 +107,6 @@ spec:
 
           securityContext:
             allowPrivilegeEscalation: false
-            runAsNonRoot: true
             capabilities:
               drop:
                 - ALL

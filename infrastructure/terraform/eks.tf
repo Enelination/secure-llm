@@ -36,6 +36,9 @@ module "eks" {
 
     vpc-cni = {
       before_compute = true
+      configuration_values = jsonencode({
+        enableNetworkPolicy = "true"
+      })
     }
 
     eks-pod-identity-agent = {}

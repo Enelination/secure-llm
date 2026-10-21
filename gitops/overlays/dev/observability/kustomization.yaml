@@ -5,7 +5,5 @@ namespace: observability
 
 resources:
   - ingress-grafana.yaml
-  - ingress-prometheus.yaml
-  - ingress-alertmanager.yaml
   - dashboard-securellm.yaml
   - prometheusrule-securellm.yaml
