@@ -8,15 +8,36 @@ metadata:
 data:
   securellm.json: |
     {
-      "annotations": { "list": [] },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
       "editable": true,
       "graphTooltip": 1,
       "title": "SecureLLM",
       "uid": "securellm-overview",
-      "tags": ["securellm", "llm"],
+      "tags": [
+        "securellm",
+        "llm"
+      ],
       "timezone": "browser",
-      "time": { "from": "now-6h", "to": "now" },
-      "refresh": "30s",
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "refresh": "10s",
       "schemaVersion": 39,
       "templating": {
         "list": [
@@ -29,109 +50,320 @@ data:
           {
             "name": "provider",
             "type": "query",
-            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${datasource}"
+            },
             "query": "label_values(llm_requests_total, provider)",
             "includeAll": true,
             "multi": true,
-            "current": { "text": "All", "value": "$__all" }
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            }
           }
         ]
       },
       "panels": [
         {
+          "id": 100,
+          "type": "row",
+          "title": "1 \u2014 Platform Overview",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
+        {
           "id": 1,
           "type": "stat",
-          "title": "Requests (last 1h)",
-          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "title": "Requests (1h)",
+          "description": "Inference requests accepted by the gateway in the last hour. Page views vs. model work.",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 0,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum(increase(llm_requests_total{provider=~\"$provider\"}[1h]))",
               "refId": "A"
             }
           ],
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "auto"
+          }
         },
         {
           "id": 2,
           "type": "stat",
           "title": "Error Rate (5m)",
-          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Share of inference requests failing upstream, as a percentage of accepted requests.",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 4,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "(100 * sum(rate(llm_errors_total{provider=~\"$provider\"}[5m])) / clamp_min(sum(rate(llm_requests_total{provider=~\"$provider\"}[5m])), 0.0001)) or vector(0)",
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ] } }, "overrides": [] },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  },
+                  {
+                    "color": "red",
+                    "value": 5
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
         },
         {
           "id": 3,
           "type": "stat",
           "title": "P95 Latency",
-          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "95th percentile inference latency. The alert threshold is 30s, not 5s, because CPU inference is slow by design.",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 8,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "histogram_quantile(0.95, sum(rate(llm_request_duration_seconds_bucket{provider=~\"$provider\"}[5m])) by (le))",
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 2 }, { "color": "red", "value": 5 } ] } }, "overrides": [] },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 5
+                  },
+                  {
+                    "color": "red",
+                    "value": 30
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          }
         },
         {
           "id": 4,
           "type": "stat",
-          "title": "Token Throughput (tokens/s)",
-          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "title": "Token Throughput",
+          "description": "Prompt + completion tokens per second. The closest thing to a cost/capacity signal.",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 12,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum(rate(llm_tokens_total{provider=~\"$provider\"}[5m]))",
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "none" }, "overrides": [] },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "auto"
+          }
         },
         {
           "id": 5,
           "type": "stat",
           "title": "In-flight Requests",
-          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Requests currently being processed. A saturation signal and a future HPA input.",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 16,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum(llm_inflight_requests{provider=~\"$provider\"})",
               "refId": "A"
             }
           ],
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "auto"
+          }
         },
         {
           "id": 6,
           "type": "stat",
           "title": "Model Health",
-          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Upstream reachability from the gateway: application-level health, independent of pod status.",
+          "gridPos": {
+            "h": 4,
+            "w": 4,
+            "x": 20,
+            "y": 1
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "min(llm_model_up{provider=~\"$provider\"})",
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } } ], "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }, "overrides": [] },
-          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ]
+            },
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "auto"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "DOWN",
+                      "color": "red",
+                      "index": 0
+                    },
+                    "1": {
+                      "text": "UP",
+                      "color": "green",
+                      "index": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          }
         },
         {
           "id": 10,
           "type": "timeseries",
           "title": "Request Rate by Status",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Every HTTP request the gateway served, split by status code. 401s and 429s are visible here.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum by (status) (rate(http_requests_total{job=\"securellm-ai-gateway\"}[5m]))",
@@ -139,14 +371,44 @@ data:
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "stacking": { "mode": "normal" } } }, "overrides": [] }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "fillOpacity": 12,
+                "lineWidth": 2,
+                "stacking": {
+                  "mode": "normal"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
         },
         {
           "id": 11,
           "type": "timeseries",
           "title": "LLM Latency (P50 / P95 / P99)",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Inference latency distribution over time. P50 tells you the typical user experience; P99 shows queueing.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "histogram_quantile(0.50, sum(rate(llm_request_duration_seconds_bucket{provider=~\"$provider\"}[5m])) by (le))",
@@ -164,14 +426,54 @@ data:
               "refId": "C"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "lineWidth": 2 } }, "overrides": [] }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "fillOpacity": 0,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 101,
+          "type": "row",
+          "title": "2 \u2014 LLM Behaviour",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 13
+          },
+          "panels": []
         },
         {
           "id": 12,
           "type": "timeseries",
           "title": "LLM Requests & Errors",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Inference throughput against upstream failures. This is the business-level signal.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 14
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum(rate(llm_requests_total{provider=~\"$provider\"}[5m]))",
@@ -184,14 +486,41 @@ data:
               "refId": "B"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10 } }, "overrides": [] }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
         },
         {
           "id": 13,
           "type": "timeseries",
           "title": "Token Throughput by Type",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Prompt vs. completion tokens. A model serving long answers has a different cost shape than one serving long prompts.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 14
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum(rate(llm_prompt_tokens_total{provider=~\"$provider\"}[5m]))",
@@ -204,14 +533,41 @@ data:
               "refId": "B"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "none", "custom": { "fillOpacity": 10 } }, "overrides": [] }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
         },
         {
           "id": 14,
           "type": "timeseries",
           "title": "Model Up / Reachability",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Application-level availability of the model provider, scraped from the gateway.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "llm_model_up{provider=~\"$provider\"}",
@@ -219,14 +575,43 @@ data:
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "min": 0, "max": 1, "custom": { "fillOpacity": 10, "lineWidth": 2 } }, "overrides": [] }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 10,
+                "lineWidth": 2
+              },
+              "min": 0,
+              "max": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
         },
         {
           "id": 15,
           "type": "timeseries",
           "title": "In-flight Requests",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "description": "Concurrent inference requests, per provider. Spikes here predict latency spikes.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 22
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "targets": [
             {
               "expr": "sum by (provider) (llm_inflight_requests{provider=~\"$provider\"})",
@@ -234,7 +619,304 @@ data:
               "refId": "A"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "none", "min": 0, "custom": { "fillOpacity": 10 } }, "overrides": [] }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              },
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 102,
+          "type": "row",
+          "title": "3 \u2014 Gateway Resources & Protection",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 30
+          },
+          "panels": []
+        },
+        {
+          "id": 16,
+          "type": "timeseries",
+          "title": "Gateway CPU (cores)",
+          "description": "CPU consumed by each gateway replica. Small by design: the model does the expensive work.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 31
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"securellm\",container=\"ai-gateway\"}[5m]))",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 17,
+          "type": "timeseries",
+          "title": "Gateway Memory",
+          "description": "Working set per gateway replica. Useful when tuning the 512Mi limit.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 31
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"securellm\",container=\"ai-gateway\"})",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 18,
+          "type": "timeseries",
+          "title": "Auth Failures by Reason",
+          "description": "Rejected credentials, split by missing vs. invalid. A spike is either an attack or a broken client.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 39
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "targets": [
+            {
+              "expr": "sum by (reason) (rate(llm_auth_failures_total[5m]))",
+              "legendFormat": "{{reason}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 19,
+          "type": "timeseries",
+          "title": "Rate-Limited by Client",
+          "description": "Requests rejected by the token bucket, per API-key identity. Per-pod buckets mean the aggregate ceiling is higher than RATE_LIMIT_RPM.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 39
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "targets": [
+            {
+              "expr": "sum by (client) (rate(llm_rate_limited_total[5m]))",
+              "legendFormat": "{{client}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 103,
+          "type": "row",
+          "title": "4 \u2014 Model Server",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 47
+          },
+          "panels": []
+        },
+        {
+          "id": 20,
+          "type": "timeseries",
+          "title": "Model CPU (cores)",
+          "description": "CPU used by llama.cpp. At 8 threads this is the inference bottleneck, and it explains the latency curve.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 48
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"securellm-models\",container=\"llama\"}[5m]))",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "Model Memory",
+          "description": "Working set of the model server; dominated by the loaded Q4_K_M weights and context buffers.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 48
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"securellm-models\",container=\"llama\"})",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "fillOpacity": 8,
+                "lineWidth": 2
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
         }
       ]
     }
