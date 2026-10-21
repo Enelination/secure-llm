@@ -22,6 +22,10 @@ spec:
             security:
               cookie_secure: "true"
               cookie_samesite: "lax"
+            users:
+              allow_signup: false
+            auth.anonymous:
+              enabled: false
 
         kubeScheduler:
           enabled: false
