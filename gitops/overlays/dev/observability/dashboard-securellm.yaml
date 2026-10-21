@@ -60,7 +60,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "100 * sum(rate(llm_errors_total{provider=~\"$provider\"}[5m])) / clamp_min(sum(rate(llm_requests_total{provider=~\"$provider\"}[5m])), 0.0001)",
+              "expr": "(100 * sum(rate(llm_errors_total{provider=~\"$provider\"}[5m])) / clamp_min(sum(rate(llm_requests_total{provider=~\"$provider\"}[5m])), 0.0001)) or vector(0)",
               "refId": "A"
             }
           ],
@@ -179,7 +179,7 @@ data:
               "refId": "A"
             },
             {
-              "expr": "sum(rate(llm_errors_total{provider=~\"$provider\"}[5m]))",
+              "expr": "sum(rate(llm_errors_total{provider=~\"$provider\"}[5m])) or vector(0)",
               "legendFormat": "errors/s",
               "refId": "B"
             }
