@@ -23,6 +23,15 @@ spec:
               cookie_secure: "true"
               cookie_samesite: "lax"
 
+        kubeScheduler:
+          enabled: false
+
+        kubeControllerManager:
+          enabled: false
+
+        kubeProxy:
+          enabled: false
+
         prometheus:
           prometheusSpec:
             ruleSelectorNilUsesHelmValues: false
