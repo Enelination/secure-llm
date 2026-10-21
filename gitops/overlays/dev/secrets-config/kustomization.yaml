@@ -6,3 +6,4 @@ resources:
   - externalsecret-grafana.yaml
   - externalsecret-api-keys.yaml
   - externalsecret-slack.yaml
+  - externalsecret-argocd.yaml
