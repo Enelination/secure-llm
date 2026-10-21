@@ -49,14 +49,14 @@ spec:
             histogram_quantile(
               0.95,
               sum(rate(llm_request_duration_seconds_bucket[5m])) by (le)
-            ) > 5
-          for: 5m
+            ) > 30
+          for: 10m
           labels:
             severity: warning
             component: model
           annotations:
-            summary: "SecureLLM P95 LLM latency above 5s"
-            description: "P95 LLM inference latency is {{ $value }}s over the last 5m."
+            summary: "SecureLLM P95 LLM latency above 30s"
+            description: "P95 LLM inference latency is {{ $value }}s over the last 10m."
 
         - alert: SecureLLMNoTraffic
           expr: sum(rate(llm_requests_total[15m])) == 0
