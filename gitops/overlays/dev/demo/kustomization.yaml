@@ -11,4 +11,4 @@ resources:
 
 images:
   - name: 391727473376.dkr.ecr.us-east-1.amazonaws.com/securellm/ai-gateway
-    newTag: 521c50034a52
+    newTag: 8b879a7d97af
