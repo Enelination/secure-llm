@@ -119,6 +119,8 @@ jobs:
         working-directory: applications/ai-gateway
         run: |
           docker build \
+            --provenance=false \
+            --sbom=false \
             -t ${{ env.IMAGE_NAME }}:${{ steps.image.outputs.tag }} \
             .
 
@@ -207,6 +209,8 @@ jobs:
         working-directory: applications/ai-gateway
         run: |
           docker build \
+            --provenance=false \
+            --sbom=false \
             -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }} \
             .
 
